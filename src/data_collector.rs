@@ -1,3 +1,5 @@
+use std::fs::File;
+
 // External imports
 use nalgebra::DVector;
 
@@ -15,6 +17,8 @@ pub(crate) struct InMemoryDataCollector {
     time: Vec<Float>,
     positions: Vec<DVector<Float>>,
     velocities: Vec<DVector<Float>>,
+
+    // TODO: Add energy to check stability
 
     // Static data
     masses: DVector<Float>,
@@ -50,6 +54,8 @@ impl InMemoryDataCollector {
 // Python interface
 #[pymethods]
 impl InMemoryDataCollector {
+
+    // ====< Getter methods >====
     fn extract_data(&self, py: Python) -> PyResult<PyObject> {
         // Create dictionary
         let dict = PyDict::new(py);
@@ -77,7 +83,9 @@ impl InMemoryDataCollector {
             let list2 = PyList::empty(py);
 
             // Add positions
-            list2.append((positions.next().unwrap(), positions.next().unwrap()))?;
+            for _j in 0..self.masses.len() {
+                list2.append((positions.next().unwrap(), positions.next().unwrap()))?;
+            }
 
             // Add list to list
             list.append(list2)?;
@@ -100,7 +108,9 @@ impl InMemoryDataCollector {
             let list2 = PyList::empty(py);
 
             // Add velocities
-            list2.append((velocities.next().unwrap(), velocities.next().unwrap()))?;
+            for _j in 0..self.masses.len() {
+                list2.append((velocities.next().unwrap(), velocities.next().unwrap()))?;
+            }
 
             // Add list to list
             list.append(list2)?;
@@ -189,6 +199,7 @@ impl InMemoryDataCollector {
         let dict = PyDict::new(py);
 
         // Add data
+        dict.set_item("masses", self.masses.as_slice())?;
         dict.set_item("positions", self.positions_at(py, timestep)?)?;
         dict.set_item("velocities", self.velocities_at(py, timestep)?)?;
 
@@ -209,4 +220,37 @@ impl InMemoryDataCollector {
         Ok(dict.to_object(py))
     }
 
+    // ====< Saving methods >====
+    fn save_csv(&self, path: &str) -> PyResult<()> {
+        use std::io::prelude::*;
+
+        // Create file
+        let mut file = File::create(path)?;
+
+        // Write headers
+        file.write_all(b"time,ID,m,x,y,dx,dy\n")?;
+
+        // Write data
+        for (i, time) in self.time.iter().enumerate() {
+            // Write data
+            for (j, mass) in self.masses.iter().enumerate() {
+                // Write data
+                file.write_all(format!("{},{},{},{},{},{},{}\n", 
+                    time, 
+                    j, 
+                    mass, 
+                    self.positions[i][2 * j], 
+                    self.positions[i][2 * j + 1], 
+                    self.velocities[i][2 * j], 
+                    self.velocities[i][2 * j + 1]
+                ).as_bytes())?;
+            }
+        }
+
+        // Close file
+        file.flush()?;
+
+        // Return
+        Ok(())
+    }
 }

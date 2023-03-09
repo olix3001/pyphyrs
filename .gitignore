@@ -1,2 +1,5 @@
 /target
 .env
+
+python/pyphyrs/__pycache__/
+python/pyphyrs/pyphyrs.cp*

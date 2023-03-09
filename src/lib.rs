@@ -15,11 +15,8 @@ pub type Vec2 = (Float, Float);
 
 // Components of the library
 mod scene;
-
 mod solvers;
-
 mod force;
-
 mod data_collector;
 
 // Base module

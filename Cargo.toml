@@ -14,6 +14,8 @@ pyo3 = "0.18.1"
 [features]
 default = ["python"]
 python = ["pyo3/extension-module"]
+
+# package features
 f64precision = []
 
 # benchmark
@@ -21,6 +23,7 @@ bench = []
 
 # for testing
 timings = []
+
 
 [profile.release]
 opt-level = 3

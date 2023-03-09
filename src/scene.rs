@@ -135,6 +135,29 @@ impl Scene {
         Ok(data_collector)
     }
 
+    // Step by one frame
+    fn step(self_: Py<Self>, dt: Float, substeps: usize, py: Python) -> PyResult<InMemoryDataCollector> {
+        // Initialize data collector
+        let mut data_collector = { self_.borrow(py).data_collector.clone() }; // Wrapped in braces to make sure it's dropped before the simulation begins
+
+        // Time simulation
+        #[cfg(feature="timings")]
+        let start = std::time::Instant::now();
+
+        // Simulate scene
+        Self::update(&self_, dt, substeps, py);
+        data_collector.collect_frame(py, &self_, 0.0);
+
+        #[cfg(feature="timings")]
+        {
+            println!("Simulation took {}ms", start.elapsed().as_millis());
+            println!("Each step took {}ms", start.elapsed().as_millis() / 1);
+        }
+
+        // Return data collector
+        Ok(data_collector)
+    }
+
     // Get positions
     fn positions(self_: PyRef<Self>) -> Vec<(Float, Float)> {
         // Create vector of positions
@@ -229,6 +252,39 @@ impl MassRef {
         Ok(self_)
     }
 
+    // Relative position setter
+    fn relative<'a>(self_: PyRef<'a, Self>, py: Python, origin: PyRef<MassRef>) -> PyResult<PyRef<'a, Self>> {
+        // Wrap in a block to release the borrow of scene
+        {
+            // Get scene
+            let mut scene = self_.scene.borrow_mut(py);
+
+            // Update position
+            scene.positions[self_.index * 2] = scene.positions[origin.index * 2];
+            scene.positions[self_.index * 2 + 1] = scene.positions[origin.index * 2 + 1];
+        }
+
+        // Return position
+        Ok(self_)
+    }
+
+    // Relative position setter with angle
+    fn at_angle<'a>(self_: PyRef<'a, Self>, py: Python, origin: PyRef<MassRef>, angle: Float, dist: Float, deg: Option<bool>) -> PyResult<PyRef<'a, Self>> {
+        // Wrap in a block to release the borrow of scene
+        {
+            // Get scene
+            let mut scene = self_.scene.borrow_mut(py);
+
+            let angle = if deg.unwrap_or(false) { angle.to_radians() } else { angle };
+            // Update position
+            scene.positions[self_.index * 2] = scene.positions[origin.index * 2] + dist * angle.cos();
+            scene.positions[self_.index * 2 + 1] = scene.positions[origin.index * 2 + 1] + dist * angle.sin();
+        }
+
+        // Return position
+        Ok(self_)
+    }
+
     // Set velocity
     fn vel<'a>(self_: PyRef<'a, Self>, py: Python, velocity: Vec2) -> PyResult<PyRef<'a, Self>> {
         // Wrap in a block to release the borrow of scene
@@ -239,6 +295,21 @@ impl MassRef {
             // Update velocity
             scene.velocities[self_.index * 2] = velocity.0;
             scene.velocities[self_.index * 2 + 1] = velocity.1;
+        }
+
+        // Return position
+        Ok(self_)
+    }
+
+    // Set mass
+    fn mass<'a>(self_: PyRef<'a, Self>, py: Python, mass: Float) -> PyResult<PyRef<'a, Self>> {
+        // Wrap in a block to release the borrow of scene
+        {
+            // Get scene
+            let mut scene = self_.scene.borrow_mut(py);
+
+            // Update mass
+            scene.masses[self_.index] = mass;
         }
 
         // Return position
@@ -263,6 +334,12 @@ impl MassRef {
 
         // Return velocity
         Ok((scene.velocities[self_.index * 2], scene.velocities[self_.index * 2 + 1]))
+    }
+
+    // Index getter
+    #[getter(index)]
+    fn get_index(self_: PyRef<Self>) -> usize {
+        self_.index
     }
 }
 
@@ -291,9 +368,11 @@ impl MassRef {
         // Get scene
         let mut scene = self.scene.borrow_mut(py);
 
-        // Apply force
-        scene.accelerations[self.index * 2] += force.0 / scene.masses[self.index];
-        scene.accelerations[self.index * 2 + 1] += force.1 / scene.masses[self.index];
+        // Apply force (if mass is not zero)
+        if scene.masses[self.index] != 0.0 {
+            scene.accelerations[self.index * 2] += force.0 / scene.masses[self.index];
+            scene.accelerations[self.index * 2 + 1] += force.1 / scene.masses[self.index];
+        }
     }
 }
 
@@ -316,11 +395,15 @@ impl MassRef {
     // Apply force
     pub fn raw_apply_force(&self, py: Python, force: Vector2<Float>) {
         let mut scene = self.scene.borrow_mut(py);
-        // Apply force
+        // Check if force is NaN
         if force.x.is_nan() || force.y.is_nan() {
             panic!("Force is NaN");
         }
 
+        // Apply force (if mass is not zero)
+        if scene.masses[self.index] == 0.0 {
+            return;
+        }
         scene.accelerations[self.index * 2] += force.x / scene.masses[self.index];
         scene.accelerations[self.index * 2 + 1] += force.y / scene.masses[self.index];
     }
