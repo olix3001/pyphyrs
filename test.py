@@ -1,5 +1,5 @@
 import pyphyrs
-import random
+from pkgutil import iter_modules
 
 # Print the version of the library
 print(pyphyrs.__version__)
@@ -8,8 +8,11 @@ print(pyphyrs.__version__)
 scene = pyphyrs.Scene()
 
 # Add masses to the scene
-m0 = scene.mass().at((10, 0)).vel((1, 10))
-m1 = scene.mass().at((0, 0))
+m0 = scene.mass().at((5, 0)).vel((1, 0))
+m1 = scene.mass().at((-5, 0)).vel((-1, 0))
+
+# Add a spring to the scene
+scene.add_force(pyphyrs.force.SpringForce(m0, m1))
 
 # run simulation
 scene.simulate(60, 200, 1/10)

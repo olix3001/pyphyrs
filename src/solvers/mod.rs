@@ -1,5 +1,3 @@
-mod euler_ode_solver;
-
 // External imports
 use nalgebra::DVector;
 
@@ -10,6 +8,7 @@ use pyo3::prelude::*;
 use crate::Float;
 
 // Import solvers
+mod euler_ode_solver;
 pub use self::euler_ode_solver::EulerODE;
 
 // Trait for ODE solvers

@@ -20,7 +20,10 @@ pub struct Scene {
     masses: DVector<Float>,
 
     // Technicals
-    ode_solver: Box<dyn Send + ODESolver>
+    ode_solver: Box<dyn Send + ODESolver>,
+
+    // Other things
+    force_generators: Vec<PyObject>,
 }
 
 // Default implementation
@@ -35,7 +38,9 @@ impl Default for Scene {
             accelerations: DVector::zeros(0),
             masses: DVector::zeros(0),
 
-            ode_solver: Box::new(EulerODE)
+            ode_solver: Box::new(EulerODE),
+
+            force_generators: Vec::new(),
         }
     }
 }
@@ -74,7 +79,7 @@ impl Scene {
         self_.positions.extend(vec![0.0, 0.0]);
         self_.velocities.extend(vec![0.0, 0.0]);
         self_.accelerations.extend(vec![0.0, 0.0]);
-        self_.masses.push(1.0);
+        self_.masses.extend([1.0]);
 
         // Return reference to the mass
         Ok(MassRef {
@@ -95,15 +100,20 @@ impl Scene {
         (self.gravity.x, self.gravity.y)
     }
 
+    // Add force generator
+    fn add_force(&mut self, force_generator: PyObject) {
+        self.force_generators.push(force_generator);
+    }
+
     // Simulate scene
-    fn simulate(mut self_: PyRefMut<Self>, steps: usize, substeps: usize, dt: Float) {
+    fn simulate(mut self_: PyRefMut<Self>, steps: usize, substeps: usize, dt: Float, py: Python) {
         // Time simulation
         #[cfg(feature="timings")]
         let start = std::time::Instant::now();
 
         // Simulate scene
         for _ in 0..steps {
-            self_.update(dt, substeps);
+            self_.update(dt, substeps, py);
         }
 
         #[cfg(feature="timings")]
@@ -131,11 +141,11 @@ impl Scene {
 // Scene internal implementation
 impl Scene {
     // Update scene
-    pub fn update(&mut self, dt: Float, substeps: usize) {
+    pub fn update(&mut self, dt: Float, substeps: usize, py: Python) {
         // Simulate substeps
         for _ in 0..substeps {
             // Apply accelerations to the scene
-            self.apply_accelerations();
+            self.apply_accelerations(py);
 
             // Update scene objects
             self.update_objects(dt);
@@ -152,10 +162,21 @@ impl Scene {
     }
 
     // Apply accelerations to the scene
-    pub fn apply_accelerations(&mut self) {
+    pub fn apply_accelerations(&mut self, py: Python) {
         // Apply gravity
         for i in 0..self.positions.len() / 2 {
             self.accelerations[i * 2 + 1] += self.gravity.y;
+        }
+
+        // Apply force generators
+        for force_generator in self.force_generators.iter() {
+            // Apply forces
+            let result = force_generator.call_method0(py, "apply_force");
+
+            // Check for errors while applying force
+            if result.is_err() {
+                panic!("Error while applying force: {:?}", result);
+            }
         }
     }
 }
@@ -254,5 +275,30 @@ impl MassRef {
         // Apply force
         scene.accelerations[self.index * 2] += force.0 / scene.masses[self.index];
         scene.accelerations[self.index * 2 + 1] += force.1 / scene.masses[self.index];
+    }
+}
+
+// Native implementation of MassRef
+impl MassRef {
+    // Get position
+    pub fn raw_position(&self, py: Python) -> Vector2<Float> {
+        let scene = self.scene.borrow(py);
+        // Return position
+        Vector2::new(scene.positions[self.index * 2], scene.positions[self.index * 2 + 1])
+    }
+
+    // Get velocity
+    pub fn raw_velocity(&self, py: Python) -> Vector2<Float> {
+        let scene = self.scene.borrow(py);
+        // Return velocity
+        Vector2::new(scene.velocities[self.index * 2], scene.velocities[self.index * 2 + 1])
+    }
+
+    // Apply force
+    pub fn raw_apply_force(&self, py: Python, force: Vector2<Float>) {
+        let mut scene = self.scene.borrow_mut(py);
+        // Apply force
+        scene.accelerations[self.index * 2] += force.x / scene.masses[self.index];
+        scene.accelerations[self.index * 2 + 1] += force.y / scene.masses[self.index];
     }
 }

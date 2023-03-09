@@ -18,9 +18,11 @@ mod scene;
 
 mod solvers;
 
+mod force;
+
 // Base module
 #[pymodule]
-fn pyphyrs(_py: Python, m: &PyModule) -> PyResult<()> {
+fn pyphyrs(py: Python, m: &PyModule) -> PyResult<()> {
     // Init __doc__ attribute
     m.add("__doc__", "Physics library for simulation and analysis")?;
     // Init __version__ attribute
@@ -33,6 +35,9 @@ fn pyphyrs(_py: Python, m: &PyModule) -> PyResult<()> {
     // ====< Submodules >====
     // Add solvers submodule
     m.add_wrapped(wrap_pymodule!(solvers::solvers))?;
+
+    // Add force submodule
+    m.add_wrapped(wrap_pymodule!(force::force))?;
 
     // Return Ok(()) to indicate that initialization was successful
     Ok(())
