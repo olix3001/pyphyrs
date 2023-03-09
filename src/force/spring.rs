@@ -2,7 +2,7 @@
 use pyo3::prelude::*;
 
 // Crate imports
-use crate::{Float, scene::{MassRef, Scene}};
+use crate::{Float, scene::MassRef};
 
 use super::ForceGenerator;
 
@@ -78,8 +78,8 @@ impl SpringForce {
         let force = k * (p1 - p2).normalize() * ((p1 - p2).norm() - rest_length);
 
         // Apply force
-        m1.raw_apply_force(py, force);
-        m2.raw_apply_force(py, -force);
+        m1.raw_apply_force(py, -force);
+        m2.raw_apply_force(py, force);
 
         // Return Ok(()) to indicate that initialization was successful
         Ok(())

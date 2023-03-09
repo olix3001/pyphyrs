@@ -14,10 +14,10 @@ pub struct Scene {
     gravity: Vector2<Float>,
 
     // Objects stored as a vector where each object is a vector of its positions
-    positions: DVector<Float>,
-    velocities: DVector<Float>,
-    accelerations: DVector<Float>,
-    masses: DVector<Float>,
+    pub(crate) positions: DVector<Float>,
+    pub(crate) velocities: DVector<Float>,
+    pub(crate) accelerations: DVector<Float>,
+    pub(crate) masses: DVector<Float>,
 
     // Technicals
     ode_solver: Box<dyn Send + ODESolver>,
@@ -106,14 +106,14 @@ impl Scene {
     }
 
     // Simulate scene
-    fn simulate(mut self_: PyRefMut<Self>, steps: usize, substeps: usize, dt: Float, py: Python) {
+    fn simulate(self_: Py<Self>, steps: usize, substeps: usize, dt: Float, py: Python) {
         // Time simulation
         #[cfg(feature="timings")]
         let start = std::time::Instant::now();
 
         // Simulate scene
         for _ in 0..steps {
-            self_.update(dt, substeps, py);
+            Self::update(&self_, dt, substeps, py);
         }
 
         #[cfg(feature="timings")]
@@ -141,14 +141,17 @@ impl Scene {
 // Scene internal implementation
 impl Scene {
     // Update scene
-    pub fn update(&mut self, dt: Float, substeps: usize, py: Python) {
+    pub fn update(self_: &Py<Self>, dt: Float, substeps: usize, py: Python) {
         // Simulate substeps
         for _ in 0..substeps {
             // Apply accelerations to the scene
-            self.apply_accelerations(py);
+            Self::apply_accelerations(self_, py);
 
             // Update scene objects
-            self.update_objects(dt);
+            {
+                let mut self_mut = self_.try_borrow_mut(py).unwrap();
+                self_mut.update_objects(dt / substeps as Float);
+            }
         }
     }
 
@@ -162,14 +165,18 @@ impl Scene {
     }
 
     // Apply accelerations to the scene
-    pub fn apply_accelerations(&mut self, py: Python) {
+    pub fn apply_accelerations(self_: &Py<Self>, py: Python) {
         // Apply gravity
-        for i in 0..self.positions.len() / 2 {
-            self.accelerations[i * 2 + 1] += self.gravity.y;
+        {
+            let mut self_mut = self_.try_borrow_mut(py).unwrap();
+            for i in 0..self_mut.positions.len() / 2 {
+                self_mut.accelerations[i * 2 + 1] += self_mut.gravity.y;
+            }
         }
 
         // Apply force generators
-        for force_generator in self.force_generators.iter() {
+        let force_generators = self_.try_borrow(py).unwrap().force_generators.clone();
+        for force_generator in force_generators.iter() {
             // Apply forces
             let result = force_generator.call_method0(py, "apply_force");
 
@@ -298,6 +305,10 @@ impl MassRef {
     pub fn raw_apply_force(&self, py: Python, force: Vector2<Float>) {
         let mut scene = self.scene.borrow_mut(py);
         // Apply force
+        if force.x.is_nan() || force.y.is_nan() {
+            panic!("Force is NaN");
+        }
+
         scene.accelerations[self.index * 2] += force.x / scene.masses[self.index];
         scene.accelerations[self.index * 2 + 1] += force.y / scene.masses[self.index];
     }

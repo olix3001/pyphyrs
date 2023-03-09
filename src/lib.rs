@@ -22,7 +22,7 @@ mod force;
 
 // Base module
 #[pymodule]
-fn pyphyrs(py: Python, m: &PyModule) -> PyResult<()> {
+fn pyphyrs(_py: Python, m: &PyModule) -> PyResult<()> {
     // Init __doc__ attribute
     m.add("__doc__", "Physics library for simulation and analysis")?;
     // Init __version__ attribute
