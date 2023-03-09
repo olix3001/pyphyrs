@@ -1,0 +1,19 @@
+[package]
+name = "pyphyrs"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "pyphyrs"
+crate-type = ["cdylib"]
+
+[dependencies]
+nalgebra = "0.32.2"
+pyo3 = "0.18.1"
+
+[profile.release]
+opt-level = 3
+lto = true
+debug = false
+debug-assertions = false
+overflow-checks = true
