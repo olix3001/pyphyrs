@@ -11,7 +11,26 @@ crate-type = ["cdylib"]
 nalgebra = "0.32.2"
 pyo3 = "0.18.1"
 
+[features]
+default = ["python"]
+python = ["pyo3/extension-module"]
+f64precision = []
+
+# benchmark
+bench = []
+
+# for testing
+timings = []
+
 [profile.release]
+opt-level = 3
+lto = true
+debug = false
+debug-assertions = false
+overflow-checks = true
+
+# for benchmarking
+[profile.test]
 opt-level = 3
 lto = true
 debug = false
