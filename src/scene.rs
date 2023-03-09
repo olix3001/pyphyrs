@@ -17,6 +17,7 @@ pub struct Scene {
     positions: DVector<Float>,
     velocities: DVector<Float>,
     accelerations: DVector<Float>,
+    masses: DVector<Float>,
 
     // Technicals
     ode_solver: Box<dyn Send + ODESolver>
@@ -28,9 +29,12 @@ impl Default for Scene {
         // Create scene
         Scene {
             gravity: Vector2::new(0.0, -9.81),
+
             positions: DVector::zeros(0),
             velocities: DVector::zeros(0),
             accelerations: DVector::zeros(0),
+            masses: DVector::zeros(0),
+
             ode_solver: Box::new(EulerODE)
         }
     }
@@ -70,6 +74,7 @@ impl Scene {
         self_.positions.extend(vec![0.0, 0.0]);
         self_.velocities.extend(vec![0.0, 0.0]);
         self_.accelerations.extend(vec![0.0, 0.0]);
+        self_.masses.push(1.0);
 
         // Return reference to the mass
         Ok(MassRef {
@@ -131,6 +136,7 @@ impl Scene {
         for _ in 0..substeps {
             // Apply accelerations to the scene
             self.apply_accelerations();
+
             // Update scene objects
             self.update_objects(dt);
         }
@@ -181,5 +187,72 @@ impl MassRef {
 
         // Return position
         Ok(self_)
+    }
+
+    // Set velocity
+    fn vel<'a>(self_: PyRef<'a, Self>, py: Python, velocity: Vec2) -> PyResult<PyRef<'a, Self>> {
+        // Wrap in a block to release the borrow of scene
+        {
+            // Get scene
+            let mut scene = self_.scene.borrow_mut(py);
+
+            // Update velocity
+            scene.velocities[self_.index * 2] = velocity.0;
+            scene.velocities[self_.index * 2 + 1] = velocity.1;
+        }
+
+        // Return position
+        Ok(self_)
+    }
+
+    // Position getter
+    #[getter(position)]
+    fn get_position(self_: PyRef<Self>, py: Python) -> PyResult<(Float, Float)> {
+        // Get scene
+        let scene = self_.scene.borrow(py);
+
+        // Return position
+        Ok((scene.positions[self_.index * 2], scene.positions[self_.index * 2 + 1]))
+    }
+
+    // Velocity getter
+    #[getter(velocity)]
+    fn get_velocity(self_: PyRef<Self>, py: Python) -> PyResult<(Float, Float)> {
+        // Get scene
+        let scene = self_.scene.borrow(py);
+
+        // Return velocity
+        Ok((scene.velocities[self_.index * 2], scene.velocities[self_.index * 2 + 1]))
+    }
+}
+
+// Internal implementation of MassRef
+impl MassRef {
+    // Get position
+    pub fn position(&self, py: Python) -> (Float, Float) {
+        // Get scene
+        let scene = self.scene.borrow(py);
+
+        // Return position
+        (scene.positions[self.index * 2], scene.positions[self.index * 2 + 1])
+    }
+
+    // Get velocity
+    pub fn velocity(&self, py: Python) -> (Float, Float) {
+        // Get scene
+        let scene = self.scene.borrow(py);
+
+        // Return velocity
+        (scene.velocities[self.index * 2], scene.velocities[self.index * 2 + 1])
+    }
+
+    // Apply force
+    pub fn apply_force(&self, py: Python, force: Vec2) {
+        // Get scene
+        let mut scene = self.scene.borrow_mut(py);
+
+        // Apply force
+        scene.accelerations[self.index * 2] += force.0 / scene.masses[self.index];
+        scene.accelerations[self.index * 2 + 1] += force.1 / scene.masses[self.index];
     }
 }
