@@ -5,7 +5,7 @@ use nalgebra::{Vector2, DVector};
 use pyo3::prelude::*;
 
 // Crate imports
-use crate::{Float, Vec2, solvers::{ODESolver, EulerODE}};
+use crate::{Float, Vec2, solvers::{ODESolver, EulerODE}, data_collector::InMemoryDataCollector};
 
 // Scene class definition
 #[pyclass]
@@ -21,6 +21,7 @@ pub struct Scene {
 
     // Technicals
     ode_solver: Box<dyn Send + ODESolver>,
+    pub(crate) data_collector: InMemoryDataCollector,
 
     // Other things
     force_generators: Vec<PyObject>,
@@ -39,6 +40,7 @@ impl Default for Scene {
             masses: DVector::zeros(0),
 
             ode_solver: Box::new(EulerODE),
+            data_collector: InMemoryDataCollector::new(),
 
             force_generators: Vec::new(),
         }
@@ -49,6 +51,7 @@ impl Default for Scene {
 #[pymethods]
 impl Scene {
     // Constructor
+    // TODO: Create signature for constructor
     #[new]
     fn new(gravity: Option<Vec2>, ode: Option<&str>) -> Self {
         // Create scene with default values
@@ -106,14 +109,20 @@ impl Scene {
     }
 
     // Simulate scene
-    fn simulate(self_: Py<Self>, steps: usize, substeps: usize, dt: Float, py: Python) {
+    fn simulate(self_: Py<Self>, steps: usize, substeps: usize, dt: Float, py: Python) -> PyResult<InMemoryDataCollector> {
+        // Initialize data collector
+        let mut data_collector = { self_.borrow(py).data_collector.clone() }; // Wrapped in braces to make sure it's dropped before the simulation begins
+
         // Time simulation
         #[cfg(feature="timings")]
         let start = std::time::Instant::now();
 
+        let mut time = 0.0;
         // Simulate scene
         for _ in 0..steps {
             Self::update(&self_, dt, substeps, py);
+            data_collector.collect_frame(py, &self_, time);
+            time += dt;
         }
 
         #[cfg(feature="timings")]
@@ -121,6 +130,9 @@ impl Scene {
             println!("Simulation took {}ms", start.elapsed().as_millis());
             println!("Each step took {}ms", start.elapsed().as_millis() / steps as u128);
         }
+
+        // Return data collector
+        Ok(data_collector)
     }
 
     // Get positions
@@ -195,7 +207,7 @@ pub struct MassRef {
     scene: Py<Scene>,
 
     // Index of the mass in the scene vectors
-    index: usize
+    pub(crate) index: usize
 }
 
 // MassRef class implementation (python)

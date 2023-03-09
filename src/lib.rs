@@ -20,6 +20,8 @@ mod solvers;
 
 mod force;
 
+mod data_collector;
+
 // Base module
 #[pymodule]
 fn pyphyrs(_py: Python, m: &PyModule) -> PyResult<()> {
