@@ -7,7 +7,7 @@ DEFAULT_SCALE = 20
 def _center(screen, pos, scale=DEFAULT_SCALE):
     return (pos[0] * scale + screen.get_width() // 2, screen.get_height() // 2 - pos[1] * scale)
 
-def _draw_frame(screen, masses, time=0, scale=DEFAULT_SCALE, fps=60, sim_time=0):
+def _draw_frame(screen, masses, time=0, scale=DEFAULT_SCALE, fps=60, sim_time=0, energy=0):
     # Draw the frame
     screen.fill((255, 255, 255))
 
@@ -23,6 +23,13 @@ def _draw_frame(screen, masses, time=0, scale=DEFAULT_SCALE, fps=60, sim_time=0)
     pygame.draw.line(screen, (0, 0, 0), (0, screen.get_height() // 2), (screen.get_width(), screen.get_height() // 2))
     pygame.draw.line(screen, (0, 0, 0), (screen.get_width() // 2, 0), (screen.get_width() // 2, screen.get_height()))
 
+    # If masses is vector of positions just draw them
+    if isinstance(masses[0], tuple):
+        for mass in masses:
+            pygame.draw.circle(screen, (23, 23, 23), _center(screen, mass, scale=scale), 5)
+        pygame.display.flip()
+        return
+
     # draw fps
     font = pygame.font.SysFont('Arial', 20)
     fps_text = font.render(f'{fps:.2f} fps', True, (0, 0, 0))
@@ -32,9 +39,19 @@ def _draw_frame(screen, masses, time=0, scale=DEFAULT_SCALE, fps=60, sim_time=0)
     sim_text = font.render(f'time per step {sim_time:.2f}ms', True, (0, 0, 0))
     screen.blit(sim_text, (5, 20))
 
+    # draw energy
+    energy_text = font.render(f'energy {energy:.2f}J', True, (0, 0, 0))
+    screen.blit(energy_text, (5, 40))
+
     # Draw the masses
     for mass in masses:
-        pygame.draw.circle(screen, (23, 23, 23), _center(screen, mass['positions'][time], scale=scale), 5*min(3, mass['mass']))
+        if mass['mass'] == 0:
+            # Draw empty circle with a cross
+            pygame.draw.circle(screen, (180, 23, 23), _center(screen, mass['positions'][time], scale=scale), 8, width=2)
+            pygame.draw.line(screen, (180, 23, 23), _center(screen, (mass['positions'][time][0] - 0.4, mass['positions'][time][1] - 0.4), scale=scale), _center(screen, (mass['positions'][time][0] + 0.4, mass['positions'][time][1] + 0.4), scale=scale))
+            pygame.draw.line(screen, (180, 23, 23), _center(screen, (mass['positions'][time][0] - 0.4, mass['positions'][time][1] + 0.4), scale=scale), _center(screen, (mass['positions'][time][0] + 0.4, mass['positions'][time][1] - 0.4), scale=scale))
+        else:
+            pygame.draw.circle(screen, (23, 23, 23), _center(screen, mass['positions'][time], scale=scale), 5*min(3, mass['mass']))
 
     # Draw velocity vectors
     for mass in masses:
@@ -113,6 +130,6 @@ def realtime(scene, scale=DEFAULT_SCALE, fps=24, substeps=200, dt=1/24, window_s
         data = results.extract_data()
         masses = pyphyrs.separate_masses(data)
         
-        _draw_frame(screen, masses, scale=scale, time=0, fps=real_fps, sim_time=sim_time)
+        _draw_frame(screen, masses, scale=scale, time=0, fps=real_fps, sim_time=sim_time, energy=data['energies'][-1])
         pygame.time.wait(int(1/fps * 1000))
         real_fps = 1000 / (pygame.time.get_ticks() - frame_start)

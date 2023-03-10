@@ -1,65 +1,53 @@
+# Double pendulum with springs
 import pyphyrs
-from pyphyrs import visualization as vis
-import math
-import matplotlib.pyplot as plt
-import random
 
-# Create new scene
-scene = pyphyrs.Scene(gravity=(0, 0))
+# Constants
+MASS = 1.0
+ORIGIN = (0.0, 5.0)
+TIME = 60 # 1 minute
+DISTANCE = 3.0
+K = 20
 
-# 50 masses connected all together in a circle
-masses = []
-for i in range(50):
-    masses.append(scene.mass()
-        .at((
-                math.cos(i*2*math.pi/50) * 100,
-                math.sin(i*2*math.pi/50) * 100
-            )))
+DT = 1/60
+SUBSTEPS = 200
 
-# Connect all masses together
-for i in range(len(masses)):
-    for j in range(len(masses)):
-        if i != j:
-            scene.add_force(pyphyrs.force.SpringForce(masses[i], masses[j], k=2))
+# Convert time to secons
+TIME = int(TIME / DT)
 
-# Add velocity to the first mass
-masses[0].vel((15, -4))
+# Initial velocities
+velocities = [
+    (0.0, 0.0), # top
+    (0.0, 0.0), # bottom
+]
 
-# Add velocity to the random mass
-rm = masses[random.randint(0, 49)] # random mass
-rm.vel((random.randint(-10, 10), random.randint(-10, 10)))
-# set its mass to be bigger
-rm.mass(30)
+# Initial offsets
+offsets = [
+    (0.0, 0.0), # top
+    (-2.0, 1.0), # bottom
+]
 
-# Set first mass to be bigger than the others
-masses[0].mass(30)
+# Initialize the scene
+scene = pyphyrs.Scene()
 
-# Run the simulation in real time
-# vis.realtime(scene, fps=60, dt=1/30, substeps=250, scale=2)
+# Add anchor
+anchor = scene.mass().mass(0).at(ORIGIN)
 
-# Simulate and then run
-result = scene.simulate(250, substeps=200, dt=1/30)
+# Add the masses
+m0 = scene.mass().mass(MASS).vel(velocities[0]).at((offsets[0][0] + ORIGIN[0], offsets[0][1]-DISTANCE + ORIGIN[1]))
+m1 = scene.mass().mass(MASS).vel(velocities[1]).at((offsets[1][0] + ORIGIN[0], offsets[1][1]-2*DISTANCE + ORIGIN[1]))
 
-# save
-result.save_csv('test.csv')
+# Add the springs
+scene.add_force(pyphyrs.force.SpringForce(m0, anchor, K, DISTANCE))
+scene.add_force(pyphyrs.force.SpringForce(m1, m0, K, DISTANCE))
 
-# animate
-vis.animate(pyphyrs.separate_masses(result.extract_data()), scale=2, dt=1/30)
+# Simulate
+result = scene.simulate(TIME, dt=DT, substeps=SUBSTEPS)
 
-# plot
-plt.figure()
+# Animate (10 times faster)
+pyphyrs.visualization.animate(pyphyrs.separate_masses(result.extract_data()), dt=DT/10)
 
-plt.subplot(2, 2, 1)
-pyphyrs.plots.plot_pos_vs_time(result.extract_data(), masses[0], new_figure=False)
-plt.subplot(2, 2, 2)
-pyphyrs.plots.plot_vel_vs_time(result.extract_data(), masses[0], new_figure=False)
+# Plot
+pyphyrs.plots.full_plot(result, [m0, m1])
 
-# plot scatter
-plt.subplot(2, 2, 3)
-pyphyrs.plots.plot_pos_scatter(result.extract_data(), masses, new_figure=False)
-
-# plot energy
-plt.subplot(2, 2, 4)
-pyphyrs.plots.plot_energy_vs_time(result.extract_data(), masses, new_figure=False)
-
-plt.show()
+# Export
+result.save_csv('test_result.csv')

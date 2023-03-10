@@ -120,7 +120,7 @@ impl Scene {
         // Simulate scene
         for _ in 0..steps {
             let energy = Self::update(&self_, dt, substeps, py);
-            data_collector.collect_frame(py, &self_, time, energy);
+            data_collector.collect_frame(py, &self_, time, energy / substeps as Float);
             time += dt;
         }
 
@@ -143,7 +143,7 @@ impl Scene {
 
         // Simulate scene
         let energy = Self::update(&self_, dt, substeps, py);
-        data_collector.collect_frame(py, &self_, 0.0, energy);
+        data_collector.collect_frame(py, &self_, 0.0, energy / substeps as Float);
 
         #[cfg(feature="timings")]
         {
@@ -317,6 +317,23 @@ impl MassRef {
         Ok(self_)
     }
 
+    // Relative position setter with angle and position origin
+    fn at_angle_pos<'a>(self_: PyRef<'a, Self>, py: Python, origin: (Float, Float), angle: Float, dist: Float, deg: Option<bool>) -> PyResult<PyRef<'a, Self>> {
+        // Wrap in a block to release the borrow of scene
+        {
+            // Get scene
+            let mut scene = self_.scene.borrow_mut(py);
+
+            let angle = if deg.unwrap_or(false) { angle.to_radians() } else { angle };
+            // Update position
+            scene.positions[self_.index * 2] = origin.0 + dist * angle.cos();
+            scene.positions[self_.index * 2 + 1] = origin.1 + dist * angle.sin();
+        }
+
+        // Return position
+        Ok(self_)
+    }
+
     // Set velocity
     fn vel<'a>(self_: PyRef<'a, Self>, py: Python, velocity: Vec2) -> PyResult<PyRef<'a, Self>> {
         // Wrap in a block to release the borrow of scene
@@ -356,6 +373,15 @@ impl MassRef {
 
         // Return position
         Ok((scene.positions[self_.index * 2], scene.positions[self_.index * 2 + 1]))
+    }
+
+    // Get distance to another mass
+    fn distance_to(self_: PyRef<Self>, py: Python, other: PyRef<MassRef>) -> PyResult<Float> {
+        // Get scene
+        let scene = self_.scene.borrow(py);
+
+        // Return distance
+        Ok(((scene.positions[self_.index * 2] - scene.positions[other.index * 2]).powi(2) + (scene.positions[self_.index * 2 + 1] - scene.positions[other.index * 2 + 1]).powi(2)).sqrt())
     }
 
     // Velocity getter

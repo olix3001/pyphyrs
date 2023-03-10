@@ -1,5 +1,6 @@
 # imports
 import matplotlib.pyplot as plt
+from .__init__ import separate_masses
 
 # different plots
 def plot_pos_vs_time(results, mass, xlabel='Time (s)', ylabel='Position (m)', title='Position vs Time', axis=None, new_figure=True):
@@ -73,3 +74,34 @@ def plot_energy_vs_time(results, masses, xlabel='Time (s)', ylabel='Energy (J)',
 
     if new_figure:
         plt.show()
+
+
+# Plot everything
+def full_plot(results, masses, mass_index=0, extract=True, axis=None):
+    """Plot everything"""
+    plt.figure()
+
+    if extract:
+        results = results.extract_data()
+    
+    # plot position vs time
+    plt.subplot(2,2,1)
+    plot_pos_vs_time(results, masses[mass_index], new_figure=False, axis=axis)
+    plt.title('Position vs Time')
+
+    # plot velocity vs time
+    plt.subplot(2,2,2)
+    plot_vel_vs_time(results, masses[mass_index], new_figure=False, axis=axis)
+    plt.title('Velocity vs Time')
+
+    # plot position scatter
+    plt.subplot(2,2,3)
+    plot_pos_scatter(results, [masses[mass_index]], new_figure=False)
+    plt.title('Position Scatter')
+
+    # plot energy vs time
+    plt.subplot(2,2,4)
+    plot_energy_vs_time(results, masses, new_figure=False)
+    plt.title('Energy vs Time')
+
+    plt.show()
