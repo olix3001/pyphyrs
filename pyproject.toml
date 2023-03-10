@@ -1,0 +1,11 @@
+[build-system]
+requires = ["maturin>=0.14"]
+build-backend = "maturin"
+
+[project]
+name = "pyphyrs"
+dependencies = ["matplotlib", "pygame"]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "python"

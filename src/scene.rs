@@ -2,7 +2,7 @@
 use nalgebra::{Vector2, DVector};
 
 // PyO3 imports
-use pyo3::prelude::*;
+use pyo3::{prelude::*, intern};
 
 // Crate imports
 use crate::{Float, Vec2, solvers::{ODESolver, EulerODE}, data_collector::InMemoryDataCollector};
@@ -114,22 +114,19 @@ impl Scene {
         let mut data_collector = { self_.borrow(py).data_collector.clone() }; // Wrapped in braces to make sure it's dropped before the simulation begins
 
         // Time simulation
-        #[cfg(feature="timings")]
         let start = std::time::Instant::now();
 
         let mut time = 0.0;
         // Simulate scene
         for _ in 0..steps {
-            Self::update(&self_, dt, substeps, py);
-            data_collector.collect_frame(py, &self_, time);
+            let energy = Self::update(&self_, dt, substeps, py);
+            data_collector.collect_frame(py, &self_, time, energy);
             time += dt;
         }
 
-        #[cfg(feature="timings")]
-        {
-            println!("Simulation took {}ms", start.elapsed().as_millis());
-            println!("Each step took {}ms", start.elapsed().as_millis() / steps as u128);
-        }
+
+        println!("Simulation took {}ms", start.elapsed().as_millis());
+        println!("Each step took {}ms", start.elapsed().as_millis() / steps as u128);
 
         // Return data collector
         Ok(data_collector)
@@ -145,8 +142,8 @@ impl Scene {
         let start = std::time::Instant::now();
 
         // Simulate scene
-        Self::update(&self_, dt, substeps, py);
-        data_collector.collect_frame(py, &self_, 0.0);
+        let energy = Self::update(&self_, dt, substeps, py);
+        data_collector.collect_frame(py, &self_, 0.0, energy);
 
         #[cfg(feature="timings")]
         {
@@ -176,50 +173,85 @@ impl Scene {
 // Scene internal implementation
 impl Scene {
     // Update scene
-    pub fn update(self_: &Py<Self>, dt: Float, substeps: usize, py: Python) {
+    pub fn update(self_: &Py<Self>, dt: Float, substeps: usize, py: Python) -> Float {
         // Simulate substeps
+        let mut energy = 0.0;
         for _ in 0..substeps {
             // Apply accelerations to the scene
-            Self::apply_accelerations(self_, py);
+            energy += Self::apply_accelerations(self_, py);
 
             // Update scene objects
             {
                 let mut self_mut = self_.try_borrow_mut(py).unwrap();
-                self_mut.update_objects(dt / substeps as Float);
+                energy += self_mut.update_objects(dt / substeps as Float);
             }
         }
+
+        // Return energy
+        energy
     }
 
     // Update scene objects
-    pub fn update_objects(&mut self, dt: Float) {
+    pub fn update_objects(&mut self, dt: Float) -> Float {
         // Use ODE solver to update objects
         self.ode_solver.solve(dt, &mut self.positions, &mut self.velocities, &mut self.accelerations);
 
+        // Calculate energy
+        let mut energy = 0.0;
+        #[cfg(not(feature="no-energy"))]
+        for i in 0..self.positions.len() / 2 {
+            if self.masses[i] == 0.0 {
+                continue;
+            }
+
+            // Ek = 1/2 * m * v^2
+            energy += 0.5 * self.masses[i] * (self.velocities[i * 2].powi(2) + self.velocities[i * 2 + 1].powi(2));
+        }
+
         // Reset accelerations
         self.accelerations.fill(0.0);
+
+        // Return energy
+        energy
     }
 
     // Apply accelerations to the scene
-    pub fn apply_accelerations(self_: &Py<Self>, py: Python) {
+    pub fn apply_accelerations(self_: &Py<Self>, py: Python) -> Float {
         // Apply gravity
         {
             let mut self_mut = self_.try_borrow_mut(py).unwrap();
             for i in 0..self_mut.positions.len() / 2 {
+                if self_mut.masses[i] == 0.0 {
+                    continue;
+                }
                 self_mut.accelerations[i * 2 + 1] += self_mut.gravity.y;
             }
         }
 
         // Apply force generators
+        let mut energy = 0.0;
         let force_generators = self_.try_borrow(py).unwrap().force_generators.clone();
         for force_generator in force_generators.iter() {
             // Apply forces
-            let result = force_generator.call_method0(py, "apply_force");
+            let result = force_generator.call_method0(py, intern!(py, "apply_force"));
+
+            // Calculate energy
+            #[cfg(not(feature="no-energy"))]
+            {
+                let energy_result = force_generator.call_method0(py, intern!(py, "get_energy"));
+                if energy_result.is_ok() {
+                    energy += energy_result.unwrap().extract::<Float>(py).unwrap();
+                }
+            }
 
             // Check for errors while applying force
             if result.is_err() {
                 panic!("Error while applying force: {:?}", result);
             }
         }
+
+        // Return energy
+        energy
     }
 }
 

@@ -21,9 +21,8 @@ f64precision = []
 # benchmark
 bench = []
 
-# for testing
-timings = []
-
+# for development
+no-energy = []
 
 [profile.release]
 opt-level = 3

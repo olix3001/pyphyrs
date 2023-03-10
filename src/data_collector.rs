@@ -4,7 +4,7 @@ use std::fs::File;
 use nalgebra::DVector;
 
 // PyO3 imports
-use pyo3::{prelude::*, types::{PyDict, PyList}};
+use pyo3::{prelude::*, types::{PyDict, PyList}, intern};
 
 // Crate imports
 use crate::{scene::{Scene, MassRef}, Float};
@@ -18,7 +18,7 @@ pub(crate) struct InMemoryDataCollector {
     positions: Vec<DVector<Float>>,
     velocities: Vec<DVector<Float>>,
 
-    // TODO: Add energy to check stability
+    energies: Vec<Float>,
 
     // Static data
     masses: DVector<Float>,
@@ -31,11 +31,12 @@ impl InMemoryDataCollector {
             time: Vec::new(),
             positions: Vec::new(),
             velocities: Vec::new(),
+            energies: Vec::new(),
             masses: DVector::zeros(0),
         }
     }
 
-    pub(crate) fn collect_frame(&mut self, py: Python, scene: &Py<Scene>, time: Float) {
+    pub(crate) fn collect_frame(&mut self, py: Python, scene: &Py<Scene>, time: Float, energy: Float) {
         // Borrow scene
         let scene = scene.borrow(py);
 
@@ -43,11 +44,36 @@ impl InMemoryDataCollector {
         self.time.push(time);
         self.positions.push(scene.positions.clone());
         self.velocities.push(scene.velocities.clone());
+        self.energies.push(energy);
 
         // Set masses if not set yet
         if self.masses.is_empty() {
             self.masses = scene.masses.clone();
         }
+    }
+}
+
+// Internal methods
+impl InMemoryDataCollector {
+    pub fn _get_byte_size(&self) -> usize {
+        // Get size of time
+        let time_size = self.time.len() * std::mem::size_of::<Float>();
+
+        // Get size of positions
+        let positions_size = self.positions.iter().map(|v| v.len() * std::mem::size_of::<Float>()).sum::<usize>();
+
+        // Get size of velocities
+        let velocities_size = self.velocities.iter().map(|v| v.len() * std::mem::size_of::<Float>()).sum::<usize>();
+
+        // Get size of masses
+        let masses_size = self.masses.len() * std::mem::size_of::<Float>();
+
+        // Return total size
+        time_size + positions_size + velocities_size + masses_size
+    }
+
+    pub fn _get_mb_size(&self) -> Float {
+        self._get_byte_size() as Float / 1024.0 / 1024.0
     }
 }
 
@@ -61,10 +87,11 @@ impl InMemoryDataCollector {
         let dict = PyDict::new(py);
 
         // Add data
-        dict.set_item("time", self.time.clone())?;
-        dict.set_item("positions", self.extract_positions(py)?)?;
-        dict.set_item("velocities", self.extract_velocities(py)?)?;
-        dict.set_item("masses", self.masses.as_slice())?;
+        dict.set_item(intern!(py, "time"), self.time.clone())?;
+        dict.set_item(intern!(py, "positions"), self.extract_positions(py)?)?;
+        dict.set_item(intern!(py, "velocities"), self.extract_velocities(py)?)?;
+        dict.set_item(intern!(py, "masses"), self.masses.as_slice())?;
+        dict.set_item(intern!(py, "energies"), self.energies.clone())?;
 
         // Return dictionary
         Ok(dict.to_object(py))
@@ -199,9 +226,10 @@ impl InMemoryDataCollector {
         let dict = PyDict::new(py);
 
         // Add data
-        dict.set_item("masses", self.masses.as_slice())?;
-        dict.set_item("positions", self.positions_at(py, timestep)?)?;
-        dict.set_item("velocities", self.velocities_at(py, timestep)?)?;
+        dict.set_item(intern!(py, "masses"), self.masses.as_slice())?;
+        dict.set_item(intern!(py, "positions"), self.positions_at(py, timestep)?)?;
+        dict.set_item(intern!(py, "velocities"), self.velocities_at(py, timestep)?)?;
+        dict.set_item(intern!(py, "energy"), self.energies[timestep])?;
 
         // Return dictionary
         Ok(dict.to_object(py))
@@ -212,9 +240,9 @@ impl InMemoryDataCollector {
         let dict = PyDict::new(py);
 
         // Add data
-        dict.set_item("mass", self.masses[particle.borrow(py).index])?;
-        dict.set_item("position", self.positions_of(py, particle.borrow(py))?)?;
-        dict.set_item("velocity", self.velocities_of(py, particle.borrow(py))?)?;
+        dict.set_item(intern!(py, "mass"), self.masses[particle.borrow(py).index])?;
+        dict.set_item(intern!(py, "position"), self.positions_of(py, particle.borrow(py))?)?;
+        dict.set_item(intern!(py, "velocity"), self.velocities_of(py, particle.borrow(py))?)?;
 
         // Return dictionary
         Ok(dict.to_object(py))

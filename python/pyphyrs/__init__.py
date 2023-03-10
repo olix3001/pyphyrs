@@ -19,4 +19,6 @@ def separate_masses(data):
         masses[i]['velocities'] = list(map(lambda e: e[i], data['velocities']))
         # add mass
         masses[i]['mass'] = data['masses'][i]
+        # add energy
+        masses[i]['energy'] = data['energies']
     return masses
