@@ -103,3 +103,7 @@ vis.realtime(scene, fps=30, dt=1/10) # dt is constant to avoid calculation mista
 It's fast :red_car:
 
 Simulation of 50 masses connected in a circle all together (2450 springs) takes about 100ms per frame (with 250 substeps).
+
+# Installation
+
+Just install wheel you need from github releases or actions.
