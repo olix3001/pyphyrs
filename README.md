@@ -107,3 +107,13 @@ Simulation of 50 masses connected in a circle all together (2450 springs) takes 
 # Installation
 
 Just install wheel you need from github releases or actions.
+
+## Building on your own
+
+### Setup
+
+You can also build this library on your own, to do so, you'll need to have python and cargo installed on your system. Once you have them, install maturin using `pip install maturin` and create new virtual environment using `python -m venv .env` (.env is a name so It can be changed). To enable venv run script from `.env/Scripts` appropriate for your os (for example `Activate.bat` for windows) using command line.
+
+### Building
+
+Once everyting is prepared just run `python -m maturin develop --release` to build and install library in your virtual environment or `python -m maturin build --release` to build wheel for python.
