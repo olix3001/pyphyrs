@@ -1,1 +1,2 @@
-# No requirements
+# only maturin
+maturin==0.14.0

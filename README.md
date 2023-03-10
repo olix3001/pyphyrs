@@ -55,9 +55,10 @@ scene.add_force(pyphyrs.force.SpringForce(m0, m1))
 
 #### Supported forces
 
-| class       | description                                                   | arguments                                                             | impl                |
-| ----------- | ------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------- |
-| SpringForce | Acts like a spring between objects you pass in a constructor. | required: m0, m1 (masses); optional: k (spring constant), rest_length | Native :heart_eyes: |
+| class        | description                                                   | arguments                                                                                                       | impl                |
+| ------------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------- |
+| SpringForce  | Acts like a spring between objects you pass in a constructor. | required: m0, m1 (masses); optional: k (spring constant), rest_length                                           | Native :heart_eyes: |
+| GravityForce | Applies gravity between provided masses                       | required: masses (an array of masses); optional: G (defaults to 0.0000674 [not accurate because of f32 limits]) | Native :heart_eyes: |
 
 ### Simulating without render
 

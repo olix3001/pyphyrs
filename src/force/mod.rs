@@ -6,7 +6,7 @@ use crate::Float;
 
 // Import Forces
 mod spring;
-
+mod gravity;
 // Create force generator class
 #[pyclass(name="ForceGenerator", subclass)]
 pub struct ForceGenerator;
@@ -56,6 +56,7 @@ pub fn force(_py: Python, m: &PyModule) -> PyResult<()> {
 
     // Add forces
     m.add_class::<spring::SpringForce>()?;
+    m.add_class::<gravity::GravityForce>()?;
 
     // Return Ok(()) to indicate that initialization was successful
     Ok(())

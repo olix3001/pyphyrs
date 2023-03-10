@@ -365,6 +365,22 @@ impl MassRef {
         Ok(self_)
     }
 
+    // Apply force
+    fn apply_force<'a>(self_: PyRef<'a, Self>, py: Python, force: Vec2) -> PyResult<PyRef<'a, Self>> {
+        // Wrap in a block to release the borrow of scene
+        {
+            // Get scene
+            let mut scene = self_.scene.borrow_mut(py);
+
+            // Update acceleration
+            scene.accelerations[self_.index * 2] += force.0 / scene.masses[self_.index];
+            scene.accelerations[self_.index * 2 + 1] += force.1 / scene.masses[self_.index];
+        }
+
+        // Return position
+        Ok(self_)
+    }
+
     // Position getter
     #[getter(position)]
     fn get_position(self_: PyRef<Self>, py: Python) -> PyResult<(Float, Float)> {
@@ -420,18 +436,6 @@ impl MassRef {
         // Return velocity
         (scene.velocities[self.index * 2], scene.velocities[self.index * 2 + 1])
     }
-
-    // Apply force
-    pub fn apply_force(&self, py: Python, force: Vec2) {
-        // Get scene
-        let mut scene = self.scene.borrow_mut(py);
-
-        // Apply force (if mass is not zero)
-        if scene.masses[self.index] != 0.0 {
-            scene.accelerations[self.index * 2] += force.0 / scene.masses[self.index];
-            scene.accelerations[self.index * 2 + 1] += force.1 / scene.masses[self.index];
-        }
-    }
 }
 
 // Native implementation of MassRef
@@ -448,6 +452,13 @@ impl MassRef {
         let scene = self.scene.borrow(py);
         // Return velocity
         Vector2::new(scene.velocities[self.index * 2], scene.velocities[self.index * 2 + 1])
+    }
+
+    // Raw mass
+    pub fn raw_mass(&self, py: Python) -> Float {
+        let scene = self.scene.borrow(py);
+        // Return mass
+        scene.masses[self.index]
     }
 
     // Apply force

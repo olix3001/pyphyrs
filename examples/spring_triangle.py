@@ -75,7 +75,7 @@ spring(masses[2], masses[0], 1.0)
 result = scene.simulate(TIME, substeps=SUBSTEPS, dt=DT)
 
 # Export the result
-result.save_csv('example_result.csv')
+result.save_csv('spring_triangle_result.csv')
 
 # Animate the result (10 times faster)
 vis.animate(pyphyrs.separate_masses(result.extract_data()), dt=1/(30*10))

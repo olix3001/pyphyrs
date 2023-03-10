@@ -50,4 +50,4 @@ pyphyrs.visualization.animate(pyphyrs.separate_masses(result.extract_data()), dt
 pyphyrs.plots.full_plot(result, [m0, m1])
 
 # Export
-result.save_csv('test_result.csv')
+result.save_csv('double_pendulum_result.csv')
